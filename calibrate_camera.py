@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 import os
 
-def calibrate_camera(output_file='data/camera_calibration.yml', grid_size=(9, 6), square_size=25.0):
+def calibrate_camera(output_file='data/camera_calibration.yml', grid_size=(7, 7), square_size=25.0):
     """
     Calibrates the camera using a chessboard pattern.
 
@@ -20,6 +20,12 @@ def calibrate_camera(output_file='data/camera_calibration.yml', grid_size=(9, 6)
     imgpoints = []  # 2d points in image plane.
 
     cap = cv2.VideoCapture(0)
+
+    # Set resolution
+    width = 1920  # Desired width (e.g., Full HD)
+    height = 1080  # Desired height
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
     print("Press 'c' to capture a frame for calibration, and 'q' to quit.")
 
@@ -52,8 +58,20 @@ def calibrate_camera(output_file='data/camera_calibration.yml', grid_size=(9, 6)
         print("Calibrating camera...")
         ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None)
         if ret:
-            cv2.FileStorage(output_file, cv2.FILE_STORAGE_WRITE).write('camera_matrix', mtx).write('dist_coeffs', dist).release()
-            print(f"Calibration saved to {output_file}")
+            try:
+                # Open file storage for writing
+                fs = cv2.FileStorage(output_file, cv2.FILE_STORAGE_WRITE)
+                if not fs.isOpened():
+                    raise IOError(f"Failed to open file: {output_file}")
+
+                # Write camera matrix and distortion coefficients
+                fs.write("camera_matrix", mtx)
+                fs.write("dist_coeffs", dist)
+                fs.release()
+
+                print(f"Calibration saved to {output_file}")
+            except Exception as e:
+                print(f"Failed to write calibration data: {e}")
         else:
             print("Calibration failed.")
     else:

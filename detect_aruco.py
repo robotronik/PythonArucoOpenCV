@@ -28,11 +28,48 @@ def detect_aruco(calib_file, marker_info):
     mtx = fs.getNode('camera_matrix').mat()
     dist = fs.getNode('dist_coeffs').mat()
     fs.release()
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    aruco_params = cv2.aruco.DetectorParameters()
+    # General detection parameters
+    aruco_params.adaptiveThreshWinSizeMin = 3
+    aruco_params.adaptiveThreshWinSizeMax = 23
+    aruco_params.adaptiveThreshWinSizeStep = 10
+    aruco_params.adaptiveThreshConstant = 7
 
-    aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_4X4_50)
-    aruco_params = cv2.aruco.DetectorParameters_create()
+    # Marker perimeter and corner parameters
+    aruco_params.minMarkerPerimeterRate = 0.03
+    aruco_params.maxMarkerPerimeterRate = 4.0
+    aruco_params.polygonalApproxAccuracyRate = 0.03
+    aruco_params.minCornerDistanceRate = 0.05
+    aruco_params.minDistanceToBorder = 3
+    aruco_params.minMarkerDistanceRate = 0.05
+
+    # Corner refinement parameters (enable subpixel refinement)
+    aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+    aruco_params.cornerRefinementWinSize = 5
+    aruco_params.relativeCornerRefinmentWinSize = 0.01  # Relative refinement window size
+    aruco_params.cornerRefinementMaxIterations = 30
+    aruco_params.cornerRefinementMinAccuracy = 0.1
+
+    # Marker border and perspective parameters
+    aruco_params.markerBorderBits = 1
+    aruco_params.perspectiveRemovePixelPerCell = 4
+    aruco_params.perspectiveRemoveIgnoredMarginPerCell = 0.13
+    aruco_params.maxErroneousBitsInBorderRate = 0.35
+    aruco_params.minOtsuStdDev = 5.0
+    aruco_params.errorCorrectionRate = 0.6
+
+    # Inverted marker detection and ArUco3 support
+    aruco_params.detectInvertedMarker = False
+    aruco_params.useAruco3Detection = False
 
     cap = cv2.VideoCapture(0)
+
+    # Set resolution
+    width = 1920  # Desired width (e.g., Full HD)
+    height = 1080  # Desired height
+    cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
+    cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
     print("Starting ArUco detection. Press 'q' to quit.")
 
@@ -43,6 +80,7 @@ def detect_aruco(calib_file, marker_info):
             break
 
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
         corners, ids, rejected = cv2.aruco.detectMarkers(gray, aruco_dict, parameters=aruco_params)
 
         if ids is not None:
@@ -54,7 +92,7 @@ def detect_aruco(calib_file, marker_info):
                     rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size, mtx, dist)
 
                     cv2.aruco.drawDetectedMarkers(frame, corners)
-                    cv2.aruco.drawAxis(frame, mtx, dist, rvec, tvec, 50)
+                    cv2.drawFrameAxes(frame, mtx, dist, rvec, tvec, 50)
 
                     marker_camera_position = tvec.flatten()  # Camera position relative to marker
 
