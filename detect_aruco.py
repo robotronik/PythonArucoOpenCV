@@ -100,8 +100,8 @@ def detect_aruco(calib_file, marker_info):
 
                     # Calculate camera position relative to the center
                     camera_position = [
-                        round(global_position[0] + marker_camera_position[0]),
-                        round(global_position[1] - marker_camera_position[1]),
+                        round(global_position[0] - marker_camera_position[1]),
+                        round(global_position[1] - marker_camera_position[0]),
                         round(marker_camera_position[2])
                     ]
                     position_data["position"] = camera_position
