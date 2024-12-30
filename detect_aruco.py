@@ -66,14 +66,16 @@ def detect_aruco(calib_file, marker_info):
     cap = cv2.VideoCapture(0)
 
     # Set resolution
-    width = 1920  # Desired width (e.g., Full HD)
-    height = 1080  # Desired height
+    width = 1280  # Desired width (e.g., Full HD)
+    height = 720  # Desired height
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
     print("Starting ArUco detection. Press 'q' to quit.")
 
+    ValidScan = False
     while True:
+
         ret, frame = cap.read()
         if not ret:
             print("Failed to capture frame.")
@@ -83,8 +85,8 @@ def detect_aruco(calib_file, marker_info):
         
         corners, ids, rejected = cv2.aruco.detectMarkers(gray, aruco_dict, parameters=aruco_params)
 
+        ValidScan = False
         if ids is not None:
-            detected_positions = []
 
             for i, marker_id in enumerate(ids.flatten()):
                 if marker_id in marker_info:
@@ -94,25 +96,22 @@ def detect_aruco(calib_file, marker_info):
                     cv2.aruco.drawDetectedMarkers(frame, corners)
                     cv2.drawFrameAxes(frame, mtx, dist, rvec, tvec, 50)
 
-                    marker_camera_position = tvec.flatten()  # Camera position relative to marker
+                    marker_camera_position = tvec.flatten().tolist()  # Camera position relative to marker
 
                     # Calculate camera position relative to the center
                     camera_position = [
-                        global_position[0] - marker_camera_position[0],
-                        global_position[1] - marker_camera_position[1],
-                        global_position[2] - marker_camera_position[2]
+                        round(global_position[0] + marker_camera_position[0]),
+                        round(global_position[1] - marker_camera_position[1]),
+                        round(marker_camera_position[2])
                     ]
-                    detected_positions.append(camera_position)
-
-            if detected_positions:
-                # Average position from all detected markers
-                avg_position = np.mean(detected_positions, axis=0).tolist()
-                position_data["position"] = avg_position
-                position_data["rotation"] = rvec.flatten().tolist()
-
-                print(f"Camera Position: {avg_position}, Rotation: {position_data['rotation']}")
+                    position_data["position"] = camera_position
+                    position_data["rotation"] = rvec.flatten().tolist()
+                    print(f"Camera Position: {position_data['position']}, Rotation: {position_data['rotation']}")
+                    ValidScan = True
 
         cv2.imshow('ArUco Detection', frame)
+        if (not ValidScan):
+            print("Did not find any aruco")
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -126,10 +125,11 @@ if __name__ == '__main__':
         sys.exit(1)
 
     marker_info = {
-        1: (100, (600, 600, 0)),   # Top-right
-        2: (100, (-600, 600, 0)),  # Top-left
-        3: (100, (-600, -600, 0)), # Bottom-left
-        4: (100, (600, -600, 0))   # Bottom-right
+        33: (100, (0, 0)),   # testing
+        20: (100, (-400, -900)),   # Top-right
+        21: (100, (-400, 900)),  # Top-left
+        22: (100, (400, -900)), # Bottom-left
+        23: (100, (400, -900))   # Bottom-right
     }
 
     # Start REST API in a separate thread
