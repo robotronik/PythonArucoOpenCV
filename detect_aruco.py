@@ -4,8 +4,10 @@ import numpy as np
 import sys
 import os
 import threading
+import argparse
 import time
 from flask import Flask, jsonify
+from scipy.spatial.transform import Rotation as R
 
 position_data = {"position": None, "rotation": None}
 app = Flask(__name__)
@@ -14,7 +16,7 @@ app = Flask(__name__)
 def get_position():
     return jsonify(position_data)
 
-def detect_aruco(calib_file, marker_info):
+def detect_aruco(calib_file, marker_info, cam=0):
     """
     Detects ArUco markers and calculates the camera's position relative to the center.
     :param calib_file: Path to the camera calibration file.
@@ -45,7 +47,7 @@ def detect_aruco(calib_file, marker_info):
     aruco_params.minMarkerDistanceRate = 0.05
 
     # Corner refinement parameters (enable subpixel refinement)
-    aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_SUBPIX
+    aruco_params.cornerRefinementMethod = cv2.aruco.CORNER_REFINE_CONTOUR
     aruco_params.cornerRefinementWinSize = 5
     aruco_params.relativeCornerRefinmentWinSize = 0.01  # Relative refinement window size
     aruco_params.cornerRefinementMaxIterations = 30
@@ -61,9 +63,9 @@ def detect_aruco(calib_file, marker_info):
 
     # Inverted marker detection and ArUco3 support
     aruco_params.detectInvertedMarker = False
-    aruco_params.useAruco3Detection = False
+    aruco_params.useAruco3Detection = True
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(cam)
 
     # Set resolution
     width = 1280  # Desired width (e.g., Full HD)
@@ -85,7 +87,6 @@ def detect_aruco(calib_file, marker_info):
         
         corners, ids, rejected = cv2.aruco.detectMarkers(gray, aruco_dict, parameters=aruco_params)
 
-        ValidScan = False
         if ids is not None:
 
             for i, marker_id in enumerate(ids.flatten()):
@@ -96,22 +97,27 @@ def detect_aruco(calib_file, marker_info):
                     cv2.aruco.drawDetectedMarkers(frame, corners)
                     cv2.drawFrameAxes(frame, mtx, dist, rvec, tvec, 50)
 
-                    marker_camera_position = tvec.flatten().tolist()  # Camera position relative to marker
+                    # Convert rvec to rotation matrix
+                    rotation_matrix, _ = cv2.Rodrigues(rvec) # rvec.flatten().tolist()
+                    tvec = tvec.reshape(3, 1)
+                    # Compute camera position in marker's coordinate system
+                    camera_position = -np.dot(rotation_matrix.T, tvec)
 
-                    # Calculate camera position relative to the center
-                    camera_position = [
-                        round(global_position[0] - marker_camera_position[1]),
-                        round(global_position[1] - marker_camera_position[0]),
-                        round(marker_camera_position[2])
+                    # Flatten to get a simple (x, y, z) array
+                    camera_position = camera_position.flatten()
+                    position_data["position"] = [
+                        round(global_position[0] - camera_position[1]),
+                        round(global_position[1] + camera_position[0])
                     ]
-                    position_data["position"] = camera_position
-                    position_data["rotation"] = rvec.flatten().tolist()
+
+                    # Step 2: Convert rotation matrix to Euler angles
+                    # Specify the order of axes (e.g., "xyz", "zyx", etc.)
+                    rotation = R.from_matrix(rotation_matrix)
+                    euler_angles = rotation.as_euler('zyx', degrees=True)  # 'xyz' or your desired convention
+                    position_data["rotation"] = -euler_angles[0] + 180
                     print(f"Camera Position: {position_data['position']}, Rotation: {position_data['rotation']}")
-                    ValidScan = True
 
         cv2.imshow('ArUco Detection', frame)
-        if (not ValidScan):
-            print("Did not find any aruco")
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -120,9 +126,16 @@ def detect_aruco(calib_file, marker_info):
     cv2.destroyAllWindows()
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print("Usage: python detect_aruco.py <calibration_file>")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description="Detect ArUco markers and run a REST API.")
+    
+    # Positional argument for calibration file
+    parser.add_argument("calibration_file", type=str, help="Path to the calibration file.")
+    
+    # Optional arguments
+    parser.add_argument("--api-port", type=int, default=5000, help="Port for the REST API (default: 5000).")
+    parser.add_argument("--cam", type=int, default=0, help="Camera number to use (default: 0).")
+
+    args = parser.parse_args()
 
     marker_info = {
         33: (100, (0, 0)),   # testing
@@ -133,8 +146,11 @@ if __name__ == '__main__':
     }
 
     # Start REST API in a separate thread
-    api_thread = threading.Thread(target=app.run, kwargs={"port": 5000, "debug": False})
+    api_thread = threading.Thread(target=app.run, kwargs={
+        "port": args.api_port,
+        "debug": False
+    })
     api_thread.daemon = True
     api_thread.start()
 
-    detect_aruco(sys.argv[1], marker_info)
+    detect_aruco(sys.argv[1], marker_info, args.cam)
