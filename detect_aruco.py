@@ -153,4 +153,4 @@ if __name__ == '__main__':
     api_thread.daemon = True
     api_thread.start()
 
-    detect_aruco(sys.argv[1], marker_info, args.cam)
+    detect_aruco(args.calibration_file, marker_info, args.cam)
