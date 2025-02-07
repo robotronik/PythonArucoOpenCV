@@ -16,7 +16,7 @@ app = Flask(__name__)
 def get_position():
     return jsonify(position_data)
 
-def detect_aruco(calib_file, marker_info, cam=0):
+def detect_aruco(calib_file, marker_info, cam=0, headless=False):
     """
     Detects ArUco markers and calculates the camera's position relative to the center.
     :param calib_file: Path to the camera calibration file.
@@ -68,8 +68,8 @@ def detect_aruco(calib_file, marker_info, cam=0):
     cap = cv2.VideoCapture(cam)
 
     # Set resolution
-    width = 1280  # Desired width (e.g., Full HD)
-    height = 720  # Desired height
+    width = 1920  # Desired width (e.g., Full HD)
+    height = 1080  # Desired height
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
@@ -114,10 +114,11 @@ def detect_aruco(calib_file, marker_info, cam=0):
                     # Specify the order of axes (e.g., "xyz", "zyx", etc.)
                     rotation = R.from_matrix(rotation_matrix)
                     euler_angles = rotation.as_euler('zyx', degrees=True)  # 'xyz' or your desired convention
-                    position_data["rotation"] = -euler_angles[0] + 180
+                    position_data["rotation"] = -euler_angles[0] + 180.0
                     print(f"Camera Position: {position_data['position']}, Rotation: {position_data['rotation']}")
 
-        cv2.imshow('ArUco Detection', frame)
+        if (not headless):
+            cv2.imshow('ArUco Detection', frame)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
@@ -134,15 +135,16 @@ if __name__ == '__main__':
     # Optional arguments
     parser.add_argument("--api-port", type=int, default=5000, help="Port for the REST API (default: 5000).")
     parser.add_argument("--cam", type=int, default=0, help="Camera number to use (default: 0).")
+    parser.add_argument("--headless", type=bool, default=False, help="If the program should run headless (default: False).")
 
     args = parser.parse_args()
 
     marker_info = {
-        33: (100, (0, 0)),   # testing
-        20: (100, (-400, -900)),   # Top-right
-        21: (100, (-400, 900)),  # Top-left
-        22: (100, (400, -900)), # Bottom-left
-        23: (100, (400, -900))   # Bottom-right
+        33: (100.0, (0.0, 0.0)),   # testing
+        20: (100.0, (-400.0, -900.0)),   # Top-right
+        21: (100.0, (-400.0, 900.0)),  # Top-left
+        22: (100.0, (400.0, -900.0)), # Bottom-left
+        23: (100.0, (400.0, -900.0))   # Bottom-right
     }
 
     # Start REST API in a separate thread
