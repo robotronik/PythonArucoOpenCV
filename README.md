@@ -7,7 +7,7 @@ This project detects ArUco markers using OpenCV's ArUco module.
 Install required libraries using:
 
 ```bash
-pip install -r requirements.txt
+sudo pip install --break-system-packages -r requirements.txt
 ```
 
 ## Camera Calibration
