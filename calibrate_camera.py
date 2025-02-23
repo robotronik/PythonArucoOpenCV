@@ -22,8 +22,8 @@ def calibrate_camera(output_file='data/camera_calibration.yml', grid_size=(7, 7)
     cap = cv2.VideoCapture(0)
 
     # Set resolution
-    width = 1280  # Desired width (e.g., Full HD)
-    height = 720  # Desired height
+    width = 1920  # Desired width (e.g., Full HD)
+    height = 1080  # Desired height
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
