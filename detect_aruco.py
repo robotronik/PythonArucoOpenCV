@@ -1,8 +1,10 @@
+#!/usr/bin/env python3
 # detect_aruco.py
-import cv2
-import numpy as np
+
 import sys
 import os
+import cv2
+import numpy as np
 import threading
 import argparse
 import time
@@ -172,6 +174,7 @@ def extract_aruco(ret, frame, mtx, dist, aruco_dict, aruco_params, headless):
     return False
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description="Detect ArUco markers and run a REST API.")
     
     # Positional argument for calibration file
