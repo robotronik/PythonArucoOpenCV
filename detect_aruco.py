@@ -117,9 +117,9 @@ def detect_aruco(calib_file, marker_info, cam=0, headless=False):
             if (not headless):
                 cv2.imshow('ArUco Detection', frame)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                status = False
-                done = True
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    status = False
+                    done = True
 
         # Break if done
         if (done):
