@@ -38,7 +38,7 @@ def api_stop():
     status = False
     return jsonify({"message": "Stopped Camera"})
 
-def detect_aruco(calib_file, marker_info, cam=0, headless=False):
+def detect_aruco(calib_file, marker_info, cam=0, headless=False, showRejected=False, width=1280, height=720):
     """
     Detects ArUco markers and calculates the camera's position relative to the center.
     :param calib_file: Path to the camera calibration file.
@@ -90,9 +90,6 @@ def detect_aruco(calib_file, marker_info, cam=0, headless=False):
 
     cap = cv2.VideoCapture(cam)
 
-    # Set resolution
-    width = 1920  # Desired width (e.g., Full HD)
-    height = 1080  # Desired height
     cap.set(cv2.CAP_PROP_FRAME_WIDTH, width)
     cap.set(cv2.CAP_PROP_FRAME_HEIGHT, height)
 
@@ -108,7 +105,7 @@ def detect_aruco(calib_file, marker_info, cam=0, headless=False):
         while(status):
             ret, frame = cap.read()
 
-            scan_res = extract_aruco(ret, frame, mtx, dist, aruco_dict, aruco_params, headless)
+            scan_res = extract_aruco(ret, frame, mtx, dist, aruco_dict, aruco_params, headless, showRejected)
             if (scan_res):
                 sucessFrames += 1
             else:
@@ -132,7 +129,7 @@ def detect_aruco(calib_file, marker_info, cam=0, headless=False):
     cap.release()
     cv2.destroyAllWindows()
 
-def extract_aruco(ret, frame, mtx, dist, aruco_dict, aruco_params, headless):
+def extract_aruco(ret, frame, mtx, dist, aruco_dict, aruco_params, headless, showRejected=False):
     global position_data
     if not ret:
         print("Failed to capture frame.")
@@ -152,6 +149,8 @@ def extract_aruco(ret, frame, mtx, dist, aruco_dict, aruco_params, headless):
                 if (not headless):
                     cv2.aruco.drawDetectedMarkers(frame, corners)
                     cv2.drawFrameAxes(frame, mtx, dist, rvec, tvec, 50)
+                    if(showRejected and len(rejected) > 0):
+                        cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(100, 0, 255))
 
                 # Convert rvec to rotation matrix
                 rotation_matrix, _ = cv2.Rodrigues(rvec) # rvec.flatten().tolist()
@@ -184,6 +183,9 @@ if __name__ == '__main__':
     parser.add_argument("--api-port", type=int, default=5000, help="Port for the REST API (default: 5000).")
     parser.add_argument("--cam", type=int, default=0, help="Camera number to use (default: 0).")
     parser.add_argument("--headless", type=bool, default=False, help="If the program should run headless (default: False).")
+    parser.add_argument("--showRejected", type=bool, default=False, help="Show rejected markers (default: False).")
+    parser.add_argument("--width", type=int, default=1280, help="Camera width (default: 1280).")
+    parser.add_argument("--height", type=int, default=720, help="Camera height (default: 720).")
 
     args = parser.parse_args()
 
@@ -203,4 +205,4 @@ if __name__ == '__main__':
     api_thread.daemon = True
     api_thread.start()
 
-    detect_aruco(args.calibration_file, marker_info, args.cam, args.headless)
+    detect_aruco(args.calibration_file, marker_info, args.cam, args.headless, args.showRejected, args.width, args.height)
