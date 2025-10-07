@@ -11,7 +11,7 @@ import time
 from flask import Flask, jsonify
 from scipy.spatial.transform import Rotation as R
 
-position_data = {"x": None, "y" : None, "theta": None}
+position_data = {"x": None, "y" : None, "a": None}
 status = False # True = running, False = stopped
 sucessFrames = 0
 failedFrames = 0
@@ -30,7 +30,7 @@ def api_start():
     status = True
     sucessFrames = 0
     failedFrames = 0
-    position_data = {"x": None, "y" : None, "theta": None}
+    position_data = {"x": None, "y" : None, "a": None}
     return jsonify({"message": "Starting Camera"})
 @app.route('/stop', methods=['GET'])
 def api_stop():
@@ -142,32 +142,40 @@ def extract_aruco(ret, frame, mtx, dist, aruco_dict, aruco_params, headless, sho
     if ids is not None:
 
         for i, marker_id in enumerate(ids.flatten()):
-            if marker_id in marker_info:
+            if marker_id in marker_info: 
                 size, global_position = marker_info[marker_id]
-                rvec, tvec, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size, mtx, dist)
+                rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size, mtx, dist)
+                rvec, tvec = rvecs[0], tvecs[0]  # shape (1,3) → (3,)
 
-                if (not headless):
+                if not headless:
                     cv2.aruco.drawDetectedMarkers(frame, corners)
                     cv2.drawFrameAxes(frame, mtx, dist, rvec, tvec, 50)
-                    if(showRejected and len(rejected) > 0):
+                    if showRejected and len(rejected) > 0:
                         cv2.aruco.drawDetectedMarkers(frame, rejected, borderColor=(100, 0, 255))
 
-                # Convert rvec to rotation matrix
-                rotation_matrix, _ = cv2.Rodrigues(rvec) # rvec.flatten().tolist()
-                tvec = tvec.reshape(3, 1)
-                # Compute camera position in marker's coordinate system
-                camera_position = -np.dot(rotation_matrix.T, tvec)
+                # Rotation matrix (marker→camera)
+                rotation_matrix, _ = cv2.Rodrigues(rvec)
 
-                # Flatten to get a simple (x, y, z) array
+                # Camera position in marker coordinates
+                camera_position = -rotation_matrix.T @ tvec.reshape(3, 1)
                 camera_position = camera_position.flatten()
-                position_data["x"] = round(global_position[0] - camera_position[1])
-                position_data["y"] = round(global_position[1] + camera_position[0])
-
+    
+                # Combine with marker’s global position
+                # assuming global_position = (X_marker, Y_marker, Z_marker)
+                position_data["x"] = float(global_position[0] - camera_position[1])
+                position_data["y"] = float(global_position[1] + camera_position[0])
+                position_data["z"] = float(camera_position[2])
+                
                 # Step 2: Convert rotation matrix to Euler angles
                 # Specify the order of axes (e.g., "xyz", "zyx", etc.)
                 rotation = R.from_matrix(rotation_matrix)
                 euler_angles = rotation.as_euler('zyx', degrees=True)  # 'xyz' or your desired convention
-                position_data["theta"] = -euler_angles[0] + 180.0
+                position_data["a"] = -euler_angles[0] + 180.0
+                if(position_data["a"] > 180.0):
+                    position_data["a"] -= 360
+                elif(position_data["a"] < -180.0):
+                    position_data["a"] += 360.0
+
                 print(f"Camera: {position_data}")
                 return True
     return False
@@ -194,7 +202,8 @@ if __name__ == '__main__':
         20: (100.0, (-400.0, -900.0)),   # Top-right
         21: (100.0, (-400.0, 900.0)),  # Top-left
         22: (100.0, (400.0, -900.0)), # Bottom-left
-        23: (100.0, (400.0, -900.0))   # Bottom-right
+        23: (100.0, (400.0, -900.0)),   # Bottom-right
+        0: (100.0, (0.0, 0.0))  # test
     }
 
     # Start REST API in a separate thread
