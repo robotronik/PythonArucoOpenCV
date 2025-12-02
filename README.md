@@ -8,6 +8,12 @@ Install required libraries using:
 
 ```bash
 sudo pip install --break-system-packages -r requirements.txt
+sudo apt install python3-picamera2
+sudo apt install libcamera-apps
+
+sudo nano /boot/firmware/config.txt
+camera_auto_detect=0
+dtoverlay=ov9281,cam0
 ```
 
 ## Camera Calibration
