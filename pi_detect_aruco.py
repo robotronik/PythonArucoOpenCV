@@ -11,9 +11,13 @@ import time
 from flask import Flask, jsonify
 from scipy.spatial.transform import Rotation as R
 from picamera2 import Picamera2
+from math import cos, sin, atan2, radians, degrees
 #sudo apt install python3-picamera2
 
-position_data = {"x": None, "y" : None, "a": None}
+deg_to_rad = np.pi / 180.0
+rad_to_deg = 180.0 / np.pi
+
+position_data = {"x": None, "y" : None, "a": None, "z": None}
 status = False # True = running, False = stopped
 sucessFrames = 0
 failedFrames = 0
@@ -26,19 +30,40 @@ def get_position():
         return jsonify({"position":position_data, "sucessFrames": sucessFrames, "totalFrames": (sucessFrames+failedFrames), "failedFrames": failedFrames})
     else:
         return jsonify({"message": "Camera is not running"})
+
 @app.route('/start', methods=['GET'])
 def api_start():
     global status, sucessFrames, failedFrames, position_data
     status = True
     sucessFrames = 0
     failedFrames = 0
-    position_data = {"x": None, "y" : None, "a": None}
+    position_data = {"x": None, "y" : None, "a": None, "z": None}
     return jsonify({"message": "Starting Camera"})
+
 @app.route('/stop', methods=['GET'])
 def api_stop():
     global status
     status = False
     return jsonify({"message": "Stopped Camera"})
+
+def add_average_position(new_pos):
+    global sucessFrames, position_data
+    if sucessFrames == 0 or position_data["a"] is None:
+        position_data = new_pos
+    else:
+        new_ratio = 1.0 / (sucessFrames + 1.0)
+        old_ratio = 1.0 - new_ratio
+        position_data["x"] = position_data["x"] * old_ratio + new_pos["x"] * new_ratio
+        position_data["y"] = position_data["y"] * old_ratio + new_pos["y"] * new_ratio
+        position_data["z"] = position_data["z"] * old_ratio + new_pos["z"] * new_ratio
+
+        # Average the angle
+        y1 = sin(position_data["a"] * deg_to_rad) * old_ratio
+        x1 = cos(position_data["a"] * deg_to_rad) * old_ratio
+        y2 = sin(new_pos["a"] * deg_to_rad) * new_ratio
+        x2 = cos(new_pos["a"] * deg_to_rad) * new_ratio
+        position_data["a"] = atan2(y1+y2, x1+x2) * rad_to_deg
+
 
 def detect_aruco(calib_file, marker_info, headless=False, showRejected=False, width=1280, height=800):
     """
@@ -163,21 +188,23 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
     
                 # Combine with marker’s global position
                 # assuming global_position = (X_marker, Y_marker, Z_marker)
-                position_data["x"] = float(global_position[0] - camera_position[1])
-                position_data["y"] = float(global_position[1] + camera_position[0])
-                position_data["z"] = float(camera_position[2])
+                new_pos_data = {"x": 0, "y" : 0, "a": 0, "z": 0}
+                new_pos_data["x"] = float(global_position[0] - camera_position[1])
+                new_pos_data["y"] = float(global_position[1] + camera_position[0])
+                new_pos_data["z"] = float(camera_position[2])
                 
                 # Step 2: Convert rotation matrix to Euler angles
                 # Specify the order of axes (e.g., "xyz", "zyx", etc.)
                 rotation = R.from_matrix(rotation_matrix)
                 euler_angles = rotation.as_euler('zyx', degrees=True)  # 'xyz' or your desired convention
-                position_data["a"] = -euler_angles[0] + 180.0
-                if(position_data["a"] > 180.0):
-                    position_data["a"] -= 360
-                elif(position_data["a"] < -180.0):
-                    position_data["a"] += 360.0
+                new_pos_data["a"] = -euler_angles[0] + 180.0
+                if(new_pos_data["a"] > 180.0):
+                    new_pos_data["a"] -= 360
+                elif(new_pos_data["a"] < -180.0):
+                    new_pos_data["a"] += 360.0
 
-                print(f"Camera: {position_data}")
+                print(f"Camera: {new_pos_data}")
+                add_average_position(new_pos_data)
                 return True
     return False
 
