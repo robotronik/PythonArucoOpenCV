@@ -8,10 +8,11 @@ import numpy as np
 import threading
 import argparse
 import time
-from flask import Flask, jsonify
+from flask import Flask, jsonify, Response
 from scipy.spatial.transform import Rotation as R
 from picamera2 import Picamera2
 from math import cos, sin, atan2, radians, degrees
+import io
 #sudo apt install python3-picamera2
 
 deg_to_rad = np.pi / 180.0
@@ -21,6 +22,8 @@ position_data = {"x": None, "y" : None, "a": None, "z": None}
 status = False # True = running, False = stopped
 sucessFrames = 0
 failedFrames = 0
+latest_frame = None
+latest_frame_lock = threading.Lock()
 app = Flask(__name__)
 
 @app.route('/position', methods=['GET'])
@@ -45,6 +48,20 @@ def api_stop():
     global status
     status = False
     return jsonify({"message": "Stopped Camera"})
+
+@app.route('/preview', methods=['GET'])
+def get_preview():
+    global latest_frame
+    with latest_frame_lock:
+        if latest_frame is None:
+            return jsonify({"message": "No preview available"}), 503
+        frame = latest_frame.copy()
+
+    ok, buffer = cv2.imencode(".jpg", frame)
+    if not ok:
+        return jsonify({"message": "Failed to encode preview"}), 500
+
+    return Response(buffer.tobytes(), mimetype="image/jpeg")
 
 def add_average_position(new_pos):
     global sucessFrames, position_data
@@ -133,6 +150,9 @@ def detect_aruco(calib_file, marker_info, headless=False, showRejected=False, wi
     while True:
         while(status):
             frame = picam2.capture_array()
+            with latest_frame_lock:
+                global latest_frame
+                latest_frame = frame.copy()
 
             scan_res = extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showRejected)
             if (scan_res):
@@ -236,7 +256,8 @@ if __name__ == '__main__':
     # Start REST API in a separate thread
     api_thread = threading.Thread(target=app.run, kwargs={
         "port": args.api_port,
-        "debug": False
+        "debug": False,
+        "host": "0.0.0.0"
     })
     api_thread.daemon = True
     api_thread.start()
