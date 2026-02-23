@@ -24,6 +24,8 @@ sucessFrames = 0
 failedFrames = 0
 latest_frame = None
 latest_frame_lock = threading.Lock()
+object_positions = {}
+object_positions_lock = threading.Lock()
 app = Flask(__name__)
 
 @app.route('/position', methods=['GET'])
@@ -41,6 +43,8 @@ def api_start():
     sucessFrames = 0
     failedFrames = 0
     position_data = {"x": None, "y" : None, "a": None, "z": None}
+    with object_positions_lock:
+        object_positions.clear()
     return jsonify({"message": "Starting Camera"})
 
 @app.route('/stop', methods=['GET'])
@@ -48,6 +52,11 @@ def api_stop():
     global status
     status = False
     return jsonify({"message": "Stopped Camera"})
+
+@app.route('/objects', methods=['GET'])
+def get_objects():
+    with object_positions_lock:
+        return jsonify({"objects": object_positions})
 
 @app.route('/preview', methods=['GET'])
 def get_preview():
@@ -179,7 +188,7 @@ def detect_aruco(calib_file, marker_info, headless=False, showRejected=False, wi
     cv2.destroyAllWindows()
 
 def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showRejected=False):
-    global position_data
+    global position_data, object_positions
 
     gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
     
@@ -187,9 +196,20 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
 
     if ids is not None:
 
+        found = False
+        detected_objects = {}
         for i, marker_id in enumerate(ids.flatten()):
-            if marker_id in marker_info: 
-                size, global_position = marker_info[marker_id]
+            if marker_id in marker_info or marker_id in gameobject:
+                if marker_id in marker_info:
+                    size, global_position = marker_info[marker_id]
+                else:
+                    entry = gameobject.get(marker_id)
+                    size = 100.0
+                    if isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                        size = float(entry[0])
+                    elif isinstance(entry, dict) and "size" in entry:
+                        size = float(entry["size"])
+
                 rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size, mtx, dist)
                 rvec, tvec = rvecs[0], tvecs[0]  # shape (1,3) → (3,)
 
@@ -205,27 +225,68 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                 # Camera position in marker coordinates
                 camera_position = -rotation_matrix.T @ tvec.reshape(3, 1)
                 camera_position = camera_position.flatten()
-    
-                # Combine with marker’s global position
-                # assuming global_position = (X_marker, Y_marker, Z_marker)
-                new_pos_data = {"x": 0, "y" : 0, "a": 0, "z": 0}
-                new_pos_data["x"] = float(global_position[0] - camera_position[1])
-                new_pos_data["y"] = float(global_position[1] + camera_position[0])
-                new_pos_data["z"] = float(camera_position[2])
-                
-                # Step 2: Convert rotation matrix to Euler angles
-                # Specify the order of axes (e.g., "xyz", "zyx", etc.)
-                rotation = R.from_matrix(rotation_matrix)
-                euler_angles = rotation.as_euler('zyx', degrees=True)  # 'xyz' or your desired convention
-                new_pos_data["a"] = -euler_angles[0] + 180.0
-                if(new_pos_data["a"] > 180.0):
-                    new_pos_data["a"] -= 360
-                elif(new_pos_data["a"] < -180.0):
-                    new_pos_data["a"] += 360.0
 
-                print(f"Camera: {new_pos_data}")
-                add_average_position(new_pos_data)
-                return True
+                if marker_id in marker_info:
+                    # Combine with marker’s global position
+                    # assuming global_position = (X_marker, Y_marker, Z_marker)
+                    new_pos_data = {"x": 0, "y" : 0, "a": 0, "z": 0}
+                    new_pos_data["x"] = float(global_position[0] - camera_position[1])
+                    new_pos_data["y"] = float(global_position[1] + camera_position[0])
+                    new_pos_data["z"] = float(camera_position[2])
+
+                    # Step 2: Convert rotation matrix to Euler angles
+                    # Specify the order of axes (e.g., "xyz", "zyx", etc.)
+                    rotation = R.from_matrix(rotation_matrix)
+                    euler_angles = rotation.as_euler('zyx', degrees=True)  # 'xyz' or your desired convention
+                    new_pos_data["a"] = -euler_angles[0] + 180.0
+                    if(new_pos_data["a"] > 180.0):
+                        new_pos_data["a"] -= 360
+                    elif(new_pos_data["a"] < -180.0):
+                        new_pos_data["a"] += 360.0
+
+                    print(f"Camera: {new_pos_data}")
+                    add_average_position(new_pos_data)
+                    found = True
+
+                if marker_id in gameobject:
+                    entry = gameobject.get(marker_id)
+                    if isinstance(entry, dict):
+                        label = entry.get("label") or entry.get("name") or str(marker_id)
+                    elif isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                        label = entry[1]
+                    else:
+                        label = entry
+
+                    rotation = R.from_matrix(rotation_matrix)
+                    euler_angles = rotation.as_euler('zyx', degrees=True)
+                    yaw = -euler_angles[0] + 180.0
+                    if(yaw > 180.0):
+                        yaw -= 360
+                    elif(yaw < -180.0):
+                        yaw += 360.0
+
+                    obj_data = {
+                        "label": label,
+                        "x": float(tvec[0][0]),
+                        "y": float(tvec[0][1]),
+                        "z": float(tvec[0][2]),
+                        "a": float(yaw),
+                        "last_seen": time.time()
+                    }
+                    key = str(marker_id)
+                    if key not in detected_objects:
+                        detected_objects[key] = []
+                    detected_objects[key].append(obj_data)
+                    found = True
+
+        with object_positions_lock:
+            object_positions.clear()
+            object_positions.update(detected_objects)
+
+        return found
+
+    with object_positions_lock:
+        object_positions.clear()
     return False
 
 if __name__ == '__main__':
@@ -251,6 +312,10 @@ if __name__ == '__main__':
         22: (100.0, (400.0, -900.0)), # Bottom-left
         23: (100.0, (400.0, 900.0)),   # Bottom-right
         0: (100.0, (0.0, 0.0))  # test
+    }
+    gameobject = {
+        36: (30.0, "Blue"),
+        47: (30.0, "Yellow"),
     }
 
     # Start REST API in a separate thread
