@@ -12,6 +12,7 @@ from flask import Flask, jsonify, Response
 from scipy.spatial.transform import Rotation as R
 from picamera2 import Picamera2
 from math import cos, sin, atan2, radians, degrees
+from flask_cors import CORS
 import io
 #sudo apt install python3-picamera2
 
@@ -27,6 +28,7 @@ latest_frame_lock = threading.Lock()
 object_positions = {}
 object_positions_lock = threading.Lock()
 app = Flask(__name__)
+CORS(app)
 
 @app.route('/position', methods=['GET'])
 def get_position():
