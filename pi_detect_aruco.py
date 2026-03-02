@@ -9,6 +9,7 @@ import threading
 import argparse
 import time
 from flask import Flask, jsonify, Response
+from flask_cors import CORS
 from scipy.spatial.transform import Rotation as R
 from picamera2 import Picamera2
 from math import cos, sin, atan2, radians, degrees
@@ -28,7 +29,7 @@ latest_frame_lock = threading.Lock()
 object_positions = {}
 object_positions_lock = threading.Lock()
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 @app.route('/position', methods=['GET'])
 def get_position():

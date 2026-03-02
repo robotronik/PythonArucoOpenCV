@@ -1,4 +1,5 @@
 numpy
 opencv-contrib-python
 flask
+flask-cors
 scipy
