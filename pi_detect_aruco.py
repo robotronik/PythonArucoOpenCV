@@ -270,9 +270,9 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
 
                     obj_data = {
                         "label": label,
-                        "x": float(tvec[0][0]),
-                        "y": float(tvec[0][1]),
-                        "z": float(tvec[0][2]),
+                        "x": float(-1 * camera_position[1]),
+                        "y": float(camera_position[0]),
+                        "z": float(camera_position[2]),
                         "a": float(yaw),
                         "last_seen": time.time()
                     }
