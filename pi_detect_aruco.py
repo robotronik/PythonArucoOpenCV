@@ -201,24 +201,24 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
         found = False
         detected_objects = {}
         for i, marker_id in enumerate(ids.flatten()):
-            print(f"i = {i} marker_id = {marker_id}")
+            #print(f"i = {i} marker_id = {marker_id}")
             if marker_id in marker_info or marker_id in gameobject:
                 if marker_id in marker_info:
-                    print(f"in marker info size and global position {marker_info[marker_id]}")
+                    #print(f"in marker info size and global position {marker_info[marker_id]}")
                     size, global_position = marker_info[marker_id]
                 else:
-                    print(f"in game object size set to 100 and entry = {gameobject.get(marker_id)}")
+                    #print(f"in game object size set to 100 and entry = {gameobject.get(marker_id)}")
                     entry = gameobject.get(marker_id)
                     size = 100.0
                     if isinstance(entry, (list, tuple)) and len(entry) >= 2:
                         size = float(entry[0])
                     elif isinstance(entry, dict) and "size" in entry:
                         size = float(entry["size"])
-                    print(f"new size set to {size}")
+                    #print(f"new size set to {size}")
 
                 rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size, mtx, dist)
                 rvec, tvec = rvecs[0], tvecs[0]  # shape (1,3) → (3,)
-                print(f"rotation vec = {rvec} and translation vect = {tvec}")
+                #print(f"rotation vec = {rvec} and translation vect = {tvec}")
                 if not headless:
                     cv2.aruco.drawDetectedMarkers(frame, corners)
                     cv2.drawFrameAxes(frame, mtx, dist, rvec, tvec, 50)
@@ -231,7 +231,7 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                 # Camera position in marker coordinates
                 camera_position = -rotation_matrix.T @ tvec.reshape(3, 1)
                 camera_position = camera_position.flatten()
-                print(f"camera position in marker coord {camera_position}")
+                #print(f"camera position in marker coord {camera_position}")
                 
                 if marker_id in marker_info:
                     # Combine with marker’s global position
@@ -251,19 +251,19 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                     elif(new_pos_data["a"] < -180.0):
                         new_pos_data["a"] += 360.0
 
-                    print(f"Camera: {new_pos_data}")
+                    #print(f"Camera: {new_pos_data}")
                     add_average_position(new_pos_data)
                     found = True
 
                 if marker_id in gameobject:
                     entry = gameobject.get(marker_id) #déjà fait ligne 211
-                    print(f" entry toujours {entry}")
+                    #print(f" entry toujours {entry}")
                     # Récupération des infos de l'objet
                     if isinstance(entry, dict):
                         label = entry.get("label") or str(marker_id)
                         real_size = float(entry.get("size", 30.0))
                     elif entry is not None:
-                        print(entry)# debug
+                        #print(entry)# debug
                         real_size = float(entry[0])
                         label = entry[1]
                     else:
@@ -274,11 +274,11 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                     
                     # Correction du centre si le tag n'est pas au milieu de l'objet (150x50)
                     # Si le tag est sur une face, le centre est à +25mm en profondeur (Z)
-                    print(tvec)#debug
+                    #print(tvec)#debug
                     rvec, tvec = rvec[0], tvec[0]
                     obj_rel_x = tvec[0] 
                     obj_rel_y = tvec[1]
-                    obj_rel_z = tvec[2] + 25.0 # Exemple : décalage vers le centre de l'objet
+                    obj_rel_z = tvec[2]
 
                     # ORIENTATION
                     rotation = R.from_matrix(rotation_matrix)
@@ -290,12 +290,12 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                     obj_data = {
                         "label": label,
                         "x": float(obj_rel_x),
-                        "y": float(obj_rel_y),
-                        "z": float(obj_rel_z),
+                        "y": float(obj_rel_z),
+                        "z": float(obj_rel_y),
                         "a": float(yaw),
                         "last_seen": time.time()
                     }
-                    
+                    key = str(marker_id)
                     if key not in detected_objects:
                         detected_objects[key] = []
                     detected_objects[key].append(obj_data)
