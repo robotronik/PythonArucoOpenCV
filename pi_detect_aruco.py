@@ -269,17 +269,6 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                     else:
                         print("Entry is None: Error")
 
-                    # POSITION : On utilise tvec (Position de l'objet / Caméra)
-                    # tvec[0] = Horizontal (x cam), tvec[1] = Vertical (y cam), tvec[2] = Profondeur (z cam)
-                    
-                    # Correction du centre si le tag n'est pas au milieu de l'objet (150x50)
-                    # Si le tag est sur une face, le centre est à +25mm en profondeur (Z)
-                    #print(tvec)#debug
-                    rvec, tvec = rvec[0], tvec[0]
-                    obj_rel_x = tvec[0] 
-                    obj_rel_y = tvec[1]
-                    obj_rel_z = tvec[2]
-
                     # ORIENTATION
                     rotation = R.from_matrix(rotation_matrix)
                     euler_angles = rotation.as_euler('zyx', degrees=True)
@@ -289,12 +278,13 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
 
                     obj_data = {
                         "label": label,
-                        "x": float(obj_rel_x),
-                        "y": float(obj_rel_z),
-                        "z": float(obj_rel_y),
+                        "x": float(float(0 - camera_position[1])),
+                        "y": float(camera_position[0]),
+                        "z": float(camera_position[2]),
                         "a": float(yaw),
                         "last_seen": time.time()
                     }
+                    #print(f"Un objet {obj_data}")
                     key = str(marker_id)
                     if key not in detected_objects:
                         detected_objects[key] = []
