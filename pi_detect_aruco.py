@@ -12,9 +12,8 @@ from flask import Flask, jsonify, Response
 from flask_cors import CORS
 from scipy.spatial.transform import Rotation as R
 from picamera2 import Picamera2
-from math import cos, sin, atan2, radians, degrees
-from flask_cors import CORS
-import io
+from math import cos, sin, atan2
+import logging
 #sudo apt install python3-picamera2
 
 deg_to_rad = np.pi / 180.0
@@ -29,6 +28,9 @@ latest_frame_lock = threading.Lock()
 object_positions = {}
 object_positions_lock = threading.Lock()
 app = Flask(__name__)
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 @app.route('/position', methods=['GET'])
@@ -202,20 +204,24 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
         found = False
         detected_objects = {}
         for i, marker_id in enumerate(ids.flatten()):
+            #print(f"i = {i} marker_id = {marker_id}")
             if marker_id in marker_info or marker_id in gameobject:
                 if marker_id in marker_info:
+                    #print(f"in marker info size and global position {marker_info[marker_id]}")
                     size, global_position = marker_info[marker_id]
                 else:
+                    #print(f"in game object size set to 100 and entry = {gameobject.get(marker_id)}")
                     entry = gameobject.get(marker_id)
                     size = 100.0
                     if isinstance(entry, (list, tuple)) and len(entry) >= 2:
                         size = float(entry[0])
                     elif isinstance(entry, dict) and "size" in entry:
                         size = float(entry["size"])
+                    #print(f"new size set to {size}")
 
                 rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size, mtx, dist)
                 rvec, tvec = rvecs[0], tvecs[0]  # shape (1,3) → (3,)
-
+                #print(f"rotation vec = {rvec} and translation vect = {tvec}")
                 if not headless:
                     cv2.aruco.drawDetectedMarkers(frame, corners)
                     cv2.drawFrameAxes(frame, mtx, dist, rvec, tvec, 50)
@@ -228,7 +234,8 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                 # Camera position in marker coordinates
                 camera_position = -rotation_matrix.T @ tvec.reshape(3, 1)
                 camera_position = camera_position.flatten()
-
+                #print(f"camera position in marker coord {camera_position}")
+                
                 if marker_id in marker_info:
                     # Combine with marker’s global position
                     # assuming global_position = (X_marker, Y_marker, Z_marker)
@@ -247,35 +254,40 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                     elif(new_pos_data["a"] < -180.0):
                         new_pos_data["a"] += 360.0
 
-                    print(f"Camera: {new_pos_data}")
+                    #print(f"Camera: {new_pos_data}")
                     add_average_position(new_pos_data)
                     found = True
 
                 if marker_id in gameobject:
-                    entry = gameobject.get(marker_id)
+                    entry = gameobject.get(marker_id) #déjà fait ligne 211
+                    #print(f" entry toujours {entry}")
+                    # Récupération des infos de l'objet
                     if isinstance(entry, dict):
-                        label = entry.get("label") or entry.get("name") or str(marker_id)
-                    elif isinstance(entry, (list, tuple)) and len(entry) >= 2:
+                        label = entry.get("label") or str(marker_id)
+                        real_size = float(entry.get("size", 30.0))
+                    elif entry is not None:
+                        #print(entry)# debug
+                        real_size = float(entry[0])
                         label = entry[1]
                     else:
-                        label = entry
+                        print("Entry is None: Error")
 
+                    # ORIENTATION
                     rotation = R.from_matrix(rotation_matrix)
                     euler_angles = rotation.as_euler('zyx', degrees=True)
                     yaw = -euler_angles[0] + 180.0
-                    if(yaw > 180.0):
-                        yaw -= 360
-                    elif(yaw < -180.0):
-                        yaw += 360.0
+                    if yaw > 180.0: yaw -= 360
+                    elif yaw < -180.0: yaw += 360.0
 
                     obj_data = {
                         "label": label,
-                        "x": float(-1 * camera_position[1]),
+                        "x": float(float(0 - camera_position[1])),
                         "y": float(camera_position[0]),
                         "z": float(camera_position[2]),
                         "a": float(yaw),
                         "last_seen": time.time()
                     }
+                    #print(f"Un objet {obj_data}")
                     key = str(marker_id)
                     if key not in detected_objects:
                         detected_objects[key] = []
