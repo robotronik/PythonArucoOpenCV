@@ -58,6 +58,17 @@ def api_stop():
     status = False
     return jsonify({"message": "Stopped Camera"})
 
+
+@app.route('/reset_tracking', methods=['GET'])
+def api_reset_tracking():
+    global sucessFrames, failedFrames, position_data
+    sucessFrames = 0
+    failedFrames = 0
+    position_data = {"x": None, "y" : None, "a": None, "z": None}
+    with object_positions_lock:
+        object_positions.clear()
+    return jsonify({"message": "Successfully resetted tracking"})
+
 @app.route('/objects', methods=['GET'])
 def get_objects():
     with object_positions_lock:
