@@ -303,7 +303,6 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                     if key not in detected_objects:
                         detected_objects[key] = []
                     detected_objects[key].append(obj_data)
-                    found = True
 
         with object_positions_lock:
             object_positions.clear()
