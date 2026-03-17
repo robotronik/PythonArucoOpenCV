@@ -19,7 +19,7 @@ import logging
 deg_to_rad = np.pi / 180.0
 rad_to_deg = 180.0 / np.pi
 
-position_data = {"x": None, "y" : None, "a": None, "z": None}
+position_data = {"x": 0.0, "y" : 0.0, "a": 0.0, "z": 0.0}
 status = False # True = running, False = stopped
 sucessFrames = 0
 failedFrames = 0
@@ -47,7 +47,7 @@ def api_start():
     status = True
     sucessFrames = 0
     failedFrames = 0
-    position_data = {"x": None, "y" : None, "a": None, "z": None}
+    position_data = {"x": 0.0, "y" : 0.0, "a": 0.0, "z": 0.0}
     with object_positions_lock:
         object_positions.clear()
     return jsonify({"message": "Starting Camera"})
@@ -64,7 +64,7 @@ def api_reset_tracking():
     global sucessFrames, failedFrames, position_data
     sucessFrames = 0
     failedFrames = 0
-    position_data = {"x": None, "y" : None, "a": None, "z": None}
+    position_data = {"x": 0.0, "y" : 0.0, "a": 0.0, "z": 0.0}
     with object_positions_lock:
         object_positions.clear()
     return jsonify({"message": "Successfully resetted tracking"})
