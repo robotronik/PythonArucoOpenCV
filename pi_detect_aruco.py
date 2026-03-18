@@ -171,11 +171,13 @@ def detect_aruco(calib_file, marker_info, headless=False, showRejected=False, wi
     done = False
     sucessFrames = 0
     failedFrames = 0
-
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    video_writer = cv2.VideoWriter('output.avi', fourcc, 30.0, (1280, 800))  # Adjust resolution as needed
+    # Wait for status to change from rest API
+    while(not status):
+        time.sleep(0.01)
 
     while True:
+        fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        video_writer = cv2.VideoWriter('output.avi', fourcc, 30.0, (1280, 800))  # Adjust resolution as needed
         while(status):
             frame = picam2.capture_array()
             with latest_frame_lock:
@@ -241,7 +243,7 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                 rvecs, tvecs, _ = cv2.aruco.estimatePoseSingleMarkers(corners[i], size, mtx, dist)
                 rvec, tvec = rvecs[0], tvecs[0]  # shape (1,3) → (3,)
                 #print(f"rotation vec = {rvec} and translation vect = {tvec}")
-                if not headless:
+                if True:
                     cv2.aruco.drawDetectedMarkers(frame, corners)
                     cv2.drawFrameAxes(frame, mtx, dist, rvec, tvec, 50)
                     if showRejected and len(rejected) > 0:
