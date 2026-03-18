@@ -198,7 +198,7 @@ def detect_aruco(calib_file, marker_info, headless=False, showRejected=False, wi
 
         # Wait for status to change from rest API
         while(not status):
-            time.sleep(0.1)
+            time.sleep(0.01)
 
     picam2.stop()
     cv2.destroyAllWindows()
