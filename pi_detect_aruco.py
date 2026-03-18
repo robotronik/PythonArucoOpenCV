@@ -172,6 +172,9 @@ def detect_aruco(calib_file, marker_info, headless=False, showRejected=False, wi
     sucessFrames = 0
     failedFrames = 0
 
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    video_writer = cv2.VideoWriter('output.avi', fourcc, 30.0, (1280, 800))  # Adjust resolution as needed
+
     while True:
         while(status):
             frame = picam2.capture_array()
@@ -191,10 +194,15 @@ def detect_aruco(calib_file, marker_info, headless=False, showRejected=False, wi
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     status = False
                     done = True
+            
+            # Save the frame to make a video
+            video_writer.write(frame)
 
         # Break if done
         if (done):
             break
+        
+        video_writer.release()
 
         # Wait for status to change from rest API
         while(not status):
