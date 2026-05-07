@@ -270,6 +270,15 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                     found = True
 
                 if marker_id in gameobject:
+
+                    # --- FILTRE DES FACES LATÉRALES ---
+                    # On vérifie l'alignement de l'axe Z du marqueur avec l'axe Z de la caméra.
+                    # 0.707 correspond au cosinus d'un angle de 45°. 
+                    # Si la valeur est inférieure, le tag est trop incliné (donc sur une face latérale).
+                    seuil_inclinaison = 0.6 
+                    if abs(rotation_matrix[2, 2]) < seuil_inclinaison:
+                        continue # On ignore ce tag et on passe au suivant dans la boucle for
+                    
                     entry = gameobject.get(marker_id) #déjà fait ligne 211
                     #print(f" entry toujours {entry}")
                     # Récupération des infos de l'objet
