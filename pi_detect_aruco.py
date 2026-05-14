@@ -270,7 +270,11 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                     found = True
 
                 if marker_id in gameobject:
-
+                    
+                    # --- FILTRE DES HAUTEURS ---
+                    if(camera_position[2] >= 45){
+                        continue # On ignore les tags à plus de 45mm du sol
+                    }
                     # --- FILTRE DES FACES LATÉRALES ---
                     # On vérifie l'alignement de l'axe Z du marqueur avec l'axe Z de la caméra.
                     # 0.707 correspond au cosinus d'un angle de 45°. 
