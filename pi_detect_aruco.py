@@ -204,7 +204,7 @@ def detect_aruco(calib_file, marker_info, headless=False, showRejected=False, wi
     cv2.destroyAllWindows()
 
 def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showRejected=False):
-    global position_data, object_positions
+    global position_data, object_positions, gameobject, marker_info
 
     gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
     
@@ -272,29 +272,30 @@ def extract_aruco(frame, mtx, dist, aruco_dict, aruco_params, headless, showReje
                 if marker_id in gameobject:
                     
                     # --- FILTRE DES HAUTEURS ---
-                    if(camera_position[2] >= 45){
+                    if camera_position[2] >= 45:
                         continue # On ignore les tags à plus de 45mm du sol
-                    }
                     # --- FILTRE DES FACES LATÉRALES ---
                     # On vérifie l'alignement de l'axe Z du marqueur avec l'axe Z de la caméra.
                     # 0.707 correspond au cosinus d'un angle de 45°. 
                     # Si la valeur est inférieure, le tag est trop incliné (donc sur une face latérale).
                     seuil_inclinaison = 0.6 
-                    if abs(rotation_matrix[2, 2]) < seuil_inclinaison:
+                    if False and abs(rotation_matrix[2, 2]) < seuil_inclinaison:
                         continue # On ignore ce tag et on passe au suivant dans la boucle for
                     
-                    entry = gameobject.get(marker_id) #déjà fait ligne 211
+                    entry = gameobject.get(marker_id)
                     #print(f" entry toujours {entry}")
                     # Récupération des infos de l'objet
+                    label = str(marker_id)
+                    real_size = 30.0
                     if isinstance(entry, dict):
                         label = entry.get("label") or str(marker_id)
                         real_size = float(entry.get("size", 30.0))
-                    elif entry is not None:
+                    elif isinstance(entry, (list, tuple)) and len(entry) >= 2:
                         #print(entry)# debug
                         real_size = float(entry[0])
                         label = entry[1]
                     else:
-                        print("Entry is None: Error")
+                        print(f"Entry is None or invalid for marker {marker_id}: Error")
 
                     # ORIENTATION
                     rotation = R.from_matrix(rotation_matrix)
